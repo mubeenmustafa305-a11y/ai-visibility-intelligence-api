@@ -1,0 +1,241 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "AI Visibility Intelligence API",
+    "description": "Postman collection for the AI Visibility & Search Intelligence assessment API.\n\nSuggested flow:\n1. Create Profile\n2. Copy profile_uuid into collection variable\n3. Run Pipeline (10–30+ seconds — raise Postman request timeout)\n4. Get Profile / List Queries / List Recommendations\n5. Recheck Query (set query_uuid from list response)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:5000"
+    },
+    {
+      "key": "profile_uuid",
+      "value": ""
+    },
+    {
+      "key": "query_uuid",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Profiles",
+      "item": [
+        {
+          "name": "Create Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.profile_uuid) {",
+                  "    pm.collectionVariables.set('profile_uuid', body.profile_uuid);",
+                  "    console.log('Saved profile_uuid:', body.profile_uuid);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Frase\",\n  \"domain\": \"frase.io\",\n  \"industry\": \"SEO Content Tools\",\n  \"description\": \"AI-powered content briefs and SEO research\",\n  \"competitors\": [\n    \"surferseo.com\",\n    \"marketmuse.com\",\n    \"clearscope.io\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles"]
+            },
+            "description": "Register a business profile. Returns 201 with profile_uuid (auto-saved to collection variable)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Profile (validation error example)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"domain\": \"not a domain\",\n  \"industry\": \"SEO\",\n  \"description\": \"ok\",\n  \"competitors\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles"]
+            },
+            "description": "Expect 400 with error envelope { error: { code, message, details } }."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles/{{profile_uuid}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles", "{{profile_uuid}}"]
+            },
+            "description": "Retrieve profile + summary stats (total_queries_discovered, avg_opportunity_score)."
+          },
+          "response": []
+        },
+        {
+          "name": "Run Pipeline",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles/{{profile_uuid}}/run",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles", "{{profile_uuid}}", "run"]
+            },
+            "description": "Runs Agent 1 → 2 → 3 synchronously. Takes 10–30+ seconds. In Postman: Settings → General → Request timeout in ms → set to 120000 or higher. Requires OPENAI/ANTHROPIC + DATAFORSEO credentials in .env."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Queries",
+      "item": [
+        {
+          "name": "List Queries",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.items && body.items.length > 0 && body.items[0].query_uuid) {",
+                  "    pm.collectionVariables.set('query_uuid', body.items[0].query_uuid);",
+                  "    console.log('Saved query_uuid:', body.items[0].query_uuid);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles/{{profile_uuid}}/queries?page=1&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles", "{{profile_uuid}}", "queries"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                },
+                {
+                  "key": "min_score",
+                  "value": "0.5",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "not_visible",
+                  "disabled": true,
+                  "description": "visible | not_visible | unknown"
+                }
+              ]
+            },
+            "description": "List discovered queries sorted by opportunity_score desc. Optional filters: min_score, status. Saves first query_uuid for recheck."
+          },
+          "response": []
+        },
+        {
+          "name": "List Queries (min_score + not_visible)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles/{{profile_uuid}}/queries?min_score=0.7&status=not_visible&page=1&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles", "{{profile_uuid}}", "queries"],
+              "query": [
+                {
+                  "key": "min_score",
+                  "value": "0.7"
+                },
+                {
+                  "key": "status",
+                  "value": "not_visible"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Recheck Query",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/queries/{{query_uuid}}/recheck",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "queries", "{{query_uuid}}", "recheck"]
+            },
+            "description": "Re-run Agent 2 (visibility scoring) for a single query. Needs DataForSEO + LLM keys."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Recommendations",
+      "item": [
+        {
+          "name": "List Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/profiles/{{profile_uuid}}/recommendations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profiles", "{{profile_uuid}}", "recommendations"]
+            },
+            "description": "Return content recommendations produced by Agent 3."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
