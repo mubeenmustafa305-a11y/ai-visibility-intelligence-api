@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      FLASK_APP: wsgi:app
+      FLASK_ENV: production
+      # Absolute SQLite path inside the container volume
+      DATABASE_URL: sqlite:////data/dev.db
+    volumes:
+      - api-data:/data
+    restart: unless-stopped
+
+volumes:
+  api-data:
